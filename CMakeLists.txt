@@ -17,6 +17,8 @@ set(CRYPTO_NOTE_SOURCES
 	Source/Frame.h
 	Source/NotePanel.cpp
 	Source/NotePanel.h
+	Source/EncryptionScheme.cpp
+	Source/EncryptionScheme.h
 )
 
 source_group("Source" TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${CRYPTO_NOTE_SOURCES})
@@ -42,6 +44,7 @@ target_link_libraries(CryptoNote
 	wx::base
 	wx::aui
 	libssl.lib
+	libcrypto.lib
 )
 
 target_link_directories(CryptoNote PRIVATE

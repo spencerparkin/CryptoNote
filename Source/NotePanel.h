@@ -16,10 +16,14 @@ public:
 	bool Load();
 	wxString GetTabTitle();
 	bool NeedsSave();
+	void Modified();
 
 private:
 
+	void OnTextChanged(wxCommandEvent& event);
+
 	wxString filePath;
+	wxString password;
 	wxTextCtrl* textControl;
 	bool needsSave;
 };

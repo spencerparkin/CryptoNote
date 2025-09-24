@@ -3,6 +3,8 @@
 #include <wx/frame.h>
 #include <wx/aui/auibook.h>
 
+class NotePanel;
+
 /**
  * 
  */
@@ -20,6 +22,8 @@ public:
 		ID_Exit,
 		ID_About
 	};
+
+	void UpdatePageTitleForPage(NotePanel* notePanel);
 
 private:
 

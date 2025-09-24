@@ -60,12 +60,16 @@ void Frame::OnNewNote(wxCommandEvent& event)
 
 void Frame::OnOpenNote(wxCommandEvent& event)
 {
-	std::unique_ptr<NotePanel> notePanel(new NotePanel(this->noteBook));
-	if (!notePanel->Load())
-		return;
+	this->Freeze();
 
-	wxString title = notePanel->GetTabTitle();
-	this->noteBook->AddPage(notePanel.release(), title, true);
+	std::unique_ptr<NotePanel> notePanel(new NotePanel(this->noteBook));
+	if (notePanel->Load())
+	{
+		wxString title = notePanel->GetTabTitle();
+		this->noteBook->AddPage(notePanel.release(), title, true);
+	}
+
+	this->Thaw();
 }
 
 void Frame::OnSaveNote(wxCommandEvent& event)
@@ -76,6 +80,13 @@ void Frame::OnSaveNote(wxCommandEvent& event)
 		return;
 
 	if (notePanel->Save())
+		this->noteBook->SetPageText(i, notePanel->GetTabTitle());
+}
+
+void Frame::UpdatePageTitleForPage(NotePanel* notePanel)
+{
+	int i = this->noteBook->FindPage(notePanel);
+	if (i != wxNOT_FOUND)
 		this->noteBook->SetPageText(i, notePanel->GetTabTitle());
 }
 

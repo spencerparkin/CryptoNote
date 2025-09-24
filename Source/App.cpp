@@ -1,5 +1,6 @@
 #include "App.h"
 #include "Frame.h"
+#include "EncryptionScheme.h"
 
 wxIMPLEMENT_APP(Application);
 
@@ -17,6 +18,8 @@ Application::Application()
 	if (!wxApp::OnInit())
 		return false;
 
+	this->encryptionScheme.reset(new AESEncryptionScheme());
+
 	this->frame = new Frame();
 	this->frame->Show();
 
@@ -26,4 +29,14 @@ Application::Application()
 /*virtual*/ int Application::OnExit()
 {
 	return 0;
+}
+
+EncryptionScheme* Application::GetEncryptionScheme()
+{
+	return this->encryptionScheme.get();
+}
+
+Frame* Application::GetFrame()
+{
+	return this->frame;
 }
