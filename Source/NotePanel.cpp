@@ -52,6 +52,12 @@ bool NotePanel::Save()
 		if (result != wxID_OK)
 			return false;
 
+		if (!this->PasswordStrongEnough(passwordDialog.GetValue()))
+		{
+			wxMessageBox("Password is not strong enough.", "Error!", wxOK | wxICON_ERROR, wxGetApp().GetFrame());
+			return false;
+		}
+
 		this->password = passwordDialog.GetValue();
 	}
 
@@ -167,4 +173,41 @@ void NotePanel::Modified()
 		this->needsSave = true;
 		wxGetApp().GetFrame()->UpdatePageTitleForPage(this);
 	}
+}
+
+bool NotePanel::ChangePassword()
+{
+	wxPasswordEntryDialog oldPasswordDialog(this, "Please enter the old password.", "Enter Password", wxEmptyString);
+	int result = oldPasswordDialog.ShowModal();
+	if (result != wxID_OK)
+		return false;
+
+	if (oldPasswordDialog.GetValue() != this->password)
+	{
+		wxMessageBox("Wrong password.", "Error!", wxOK | wxICON_ERROR, wxGetApp().GetFrame());
+		return false;
+	}
+
+	wxPasswordEntryDialog newPasswordDialog(this, "Please enter a new password.  Don't forget it!", "Create Password", wxEmptyString);
+	result = newPasswordDialog.ShowModal();
+	if (result != wxID_OK)
+		return false;
+
+	if (!this->PasswordStrongEnough(newPasswordDialog.GetValue()))
+	{
+		wxMessageBox("Password is not strong enough.", "Error!", wxOK | wxICON_ERROR, wxGetApp().GetFrame());
+		return false;
+	}
+
+	this->password = newPasswordDialog.GetValue();
+	this->Modified();
+	return true;
+}
+
+bool NotePanel::PasswordStrongEnough(const wxString& passwordCandidate)
+{
+	if (passwordCandidate.length() < 8)
+		return false;
+
+	return true;
 }

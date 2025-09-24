@@ -19,6 +19,7 @@ public:
 		ID_NewNote = wxID_HIGHEST,
 		ID_OpenNote,
 		ID_SaveNote,
+		ID_ChangePassword,
 		ID_Exit,
 		ID_About
 	};
@@ -34,6 +35,7 @@ private:
 	void OnAbout(wxCommandEvent& event);
 	void OnUpdateUI(wxUpdateUIEvent& event);
 	void OnPageClose(wxAuiNotebookEvent& event);
+	void OnChangePassword(wxCommandEvent& event);
 
 	wxAuiNotebook* noteBook;
 };

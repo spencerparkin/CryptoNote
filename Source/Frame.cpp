@@ -15,6 +15,9 @@ Frame::Frame() : wxFrame(nullptr, wxID_ANY, "Crypto Note", wxDefaultPosition, wx
 	fileMenu->AppendSeparator();
 	fileMenu->Append(new wxMenuItem(fileMenu, ID_Exit, "Exit", "Close this program."));
 
+	wxMenu* optionsMenu = new wxMenu();
+	optionsMenu->Append(new wxMenuItem(optionsMenu, ID_ChangePassword, "Change Password", "Change the password used on the current note."));
+
 	fileMenu->FindItem(ID_NewNote)->SetBitmap(wxArtProvider::GetBitmapBundle(wxART_NEW, wxART_MENU));
 	fileMenu->FindItem(ID_OpenNote)->SetBitmap(wxArtProvider::GetBitmapBundle(wxART_FILE_OPEN, wxART_MENU));
 	fileMenu->FindItem(ID_SaveNote)->SetBitmap(wxArtProvider::GetBitmapBundle(wxART_FILE_SAVE, wxART_MENU));
@@ -25,6 +28,7 @@ Frame::Frame() : wxFrame(nullptr, wxID_ANY, "Crypto Note", wxDefaultPosition, wx
 
 	wxMenuBar* menuBar = new wxMenuBar();
 	menuBar->Append(fileMenu, "File");
+	menuBar->Append(optionsMenu, "Options");
 	menuBar->Append(helpMenu, "Help");
 	this->SetMenuBar(menuBar);
 
@@ -40,16 +44,28 @@ Frame::Frame() : wxFrame(nullptr, wxID_ANY, "Crypto Note", wxDefaultPosition, wx
 	this->Bind(wxEVT_MENU, &Frame::OnNewNote, this, ID_NewNote);
 	this->Bind(wxEVT_MENU, &Frame::OnOpenNote, this, ID_OpenNote);
 	this->Bind(wxEVT_MENU, &Frame::OnSaveNote, this, ID_SaveNote);
+	this->Bind(wxEVT_MENU, &Frame::OnChangePassword, this, ID_ChangePassword);
 	this->Bind(wxEVT_MENU, &Frame::OnExit, this, ID_Exit);
 	this->Bind(wxEVT_MENU, &Frame::OnAbout, this, ID_About);
 	this->Bind(wxEVT_UPDATE_UI, &Frame::OnUpdateUI, this, ID_NewNote);
 	this->Bind(wxEVT_UPDATE_UI, &Frame::OnUpdateUI, this, ID_OpenNote);
 	this->Bind(wxEVT_UPDATE_UI, &Frame::OnUpdateUI, this, ID_SaveNote);
+	this->Bind(wxEVT_UPDATE_UI, &Frame::OnUpdateUI, this, ID_ChangePassword);
 	this->Bind(wxEVT_AUINOTEBOOK_PAGE_CLOSE, &Frame::OnPageClose, this);
 }
 
 /*virtual*/ Frame::~Frame()
 {
+}
+
+void Frame::OnChangePassword(wxCommandEvent& event)
+{
+	int i = this->noteBook->GetSelection();
+	auto notePanel = dynamic_cast<NotePanel*>(this->noteBook->GetPage(i));
+	if (!notePanel)
+		return;
+
+	notePanel->ChangePassword();
 }
 
 void Frame::OnNewNote(wxCommandEvent& event)
@@ -139,6 +155,7 @@ void Frame::OnUpdateUI(wxUpdateUIEvent& event)
 			break;
 		}
 		case ID_SaveNote:
+		case ID_ChangePassword:
 		{
 			event.Enable(this->noteBook->GetSelection() != wxNOT_FOUND);
 			break;
