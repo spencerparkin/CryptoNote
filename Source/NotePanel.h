@@ -18,6 +18,7 @@ public:
 	bool NeedsSave();
 	void Modified();
 	bool ChangePassword();
+	wxString GetSelectedText();
 
 private:
 

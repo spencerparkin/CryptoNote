@@ -33,6 +33,11 @@ void NotePanel::OnTextChanged(wxCommandEvent& event)
 	this->Modified();
 }
 
+wxString NotePanel::GetSelectedText()
+{
+	return this->textControl->GetStringSelection();
+}
+
 bool NotePanel::Save()
 {
 	if (this->filePath.empty())

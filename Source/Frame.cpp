@@ -6,6 +6,7 @@
 #include <wx/msgdlg.h>
 #include <wx/aboutdlg.h>
 #include <wx/accel.h>
+#include <wx/textdlg.h>
 
 Frame::Frame() : wxFrame(nullptr, wxID_ANY, "Crypto Note", wxDefaultPosition, wxSize(1200, 1000))
 {
@@ -15,6 +16,10 @@ Frame::Frame() : wxFrame(nullptr, wxID_ANY, "Crypto Note", wxDefaultPosition, wx
 	fileMenu->Append(new wxMenuItem(fileMenu, ID_SaveNote, "Save\tCtrl+S", "Save the current note."));
 	fileMenu->AppendSeparator();
 	fileMenu->Append(new wxMenuItem(fileMenu, ID_Exit, "Exit", "Close this program."));
+
+	wxMenu* editMenu = new wxMenu();
+	editMenu->Append(new wxMenuItem(editMenu, ID_Find, "Find\tCtrl+F", "Find text in the current note."));
+	editMenu->Append(new wxMenuItem(editMenu, ID_FindAndReplace, "Find & Replace", "Replace all occurrances of certain text with other text."));
 
 	wxMenu* optionsMenu = new wxMenu();
 	optionsMenu->Append(new wxMenuItem(optionsMenu, ID_ChangePassword, "Change Password", "Change the password used on the current note."));
@@ -29,6 +34,7 @@ Frame::Frame() : wxFrame(nullptr, wxID_ANY, "Crypto Note", wxDefaultPosition, wx
 
 	wxMenuBar* menuBar = new wxMenuBar();
 	menuBar->Append(fileMenu, "File");
+	menuBar->Append(editMenu, "Edit");
 	menuBar->Append(optionsMenu, "Options");
 	menuBar->Append(helpMenu, "Help");
 	this->SetMenuBar(menuBar);
@@ -48,16 +54,21 @@ Frame::Frame() : wxFrame(nullptr, wxID_ANY, "Crypto Note", wxDefaultPosition, wx
 	this->Bind(wxEVT_MENU, &Frame::OnChangePassword, this, ID_ChangePassword);
 	this->Bind(wxEVT_MENU, &Frame::OnExit, this, ID_Exit);
 	this->Bind(wxEVT_MENU, &Frame::OnAbout, this, ID_About);
+	this->Bind(wxEVT_MENU, &Frame::OnFind, this, ID_Find);
+	this->Bind(wxEVT_MENU, &Frame::OnFind, this, ID_FindAndReplace);
 	this->Bind(wxEVT_UPDATE_UI, &Frame::OnUpdateUI, this, ID_NewNote);
 	this->Bind(wxEVT_UPDATE_UI, &Frame::OnUpdateUI, this, ID_OpenNote);
 	this->Bind(wxEVT_UPDATE_UI, &Frame::OnUpdateUI, this, ID_SaveNote);
 	this->Bind(wxEVT_UPDATE_UI, &Frame::OnUpdateUI, this, ID_ChangePassword);
+	this->Bind(wxEVT_UPDATE_UI, &Frame::OnUpdateUI, this, ID_Find);
+	this->Bind(wxEVT_UPDATE_UI, &Frame::OnUpdateUI, this, ID_FindAndReplace);
 	this->Bind(wxEVT_AUINOTEBOOK_PAGE_CLOSE, &Frame::OnPageClose, this);
 
-	wxAcceleratorEntry accelEntryArray[3];
+	wxAcceleratorEntry accelEntryArray[4];
 	accelEntryArray[0].Set(wxACCEL_CTRL, (int)'S', ID_SaveNote);
 	accelEntryArray[1].Set(wxACCEL_CTRL, (int)'N', ID_NewNote);
 	accelEntryArray[2].Set(wxACCEL_CTRL, (int)'O', ID_OpenNote);
+	accelEntryArray[3].Set(wxACCEL_CTRL, (int)'F', ID_Find);
 
 	int numAccelEntries = sizeof(accelEntryArray) / sizeof(wxAcceleratorEntry);
 
@@ -67,6 +78,30 @@ Frame::Frame() : wxFrame(nullptr, wxID_ANY, "Crypto Note", wxDefaultPosition, wx
 
 /*virtual*/ Frame::~Frame()
 {
+}
+
+void Frame::OnFind(wxCommandEvent& event)
+{
+	int i = this->noteBook->GetSelection();
+	auto notePanel = dynamic_cast<NotePanel*>(this->noteBook->GetPage(i));
+	if (!notePanel)
+		return;
+
+	wxString searchText = notePanel->GetSelectedText();
+	wxTextEntryDialog searchTextDialog(this, "Enter search text.", "Find", searchText);
+	if (searchTextDialog.ShowModal() != wxID_OK)
+		return;
+
+	searchText = searchTextDialog.GetValue();
+
+	if (event.GetId() == ID_FindAndReplace)
+	{
+		wxTextEntryDialog replaceTextDialog(this, "Enter replacement text.", "Replace", searchText);
+		if (replaceTextDialog.ShowModal() != wxID_OK)
+			return;
+	}
+
+	// STPTODO: Write this.
 }
 
 void Frame::OnChangePassword(wxCommandEvent& event)
@@ -167,6 +202,8 @@ void Frame::OnUpdateUI(wxUpdateUIEvent& event)
 		}
 		case ID_SaveNote:
 		case ID_ChangePassword:
+		case ID_Find:
+		case ID_FindAndReplace:
 		{
 			event.Enable(this->noteBook->GetSelection() != wxNOT_FOUND);
 			break;

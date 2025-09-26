@@ -20,6 +20,8 @@ public:
 		ID_OpenNote,
 		ID_SaveNote,
 		ID_ChangePassword,
+		ID_Find,
+		ID_FindAndReplace,
 		ID_Exit,
 		ID_About
 	};
@@ -36,6 +38,7 @@ private:
 	void OnUpdateUI(wxUpdateUIEvent& event);
 	void OnPageClose(wxAuiNotebookEvent& event);
 	void OnChangePassword(wxCommandEvent& event);
+	void OnFind(wxCommandEvent& event);
 
 	wxAuiNotebook* noteBook;
 };
