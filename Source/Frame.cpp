@@ -5,13 +5,14 @@
 #include <wx/artprov.h>
 #include <wx/msgdlg.h>
 #include <wx/aboutdlg.h>
+#include <wx/accel.h>
 
 Frame::Frame() : wxFrame(nullptr, wxID_ANY, "Crypto Note", wxDefaultPosition, wxSize(1200, 1000))
 {
 	wxMenu* fileMenu = new wxMenu();
-	fileMenu->Append(new wxMenuItem(fileMenu, ID_NewNote, "New", "Create a new note."));
-	fileMenu->Append(new wxMenuItem(fileMenu, ID_OpenNote, "Open", "Open an existing encpted note."));
-	fileMenu->Append(new wxMenuItem(fileMenu, ID_SaveNote, "Save", "Save the current note."));
+	fileMenu->Append(new wxMenuItem(fileMenu, ID_NewNote, "New\tCtrl+N", "Create a new note."));
+	fileMenu->Append(new wxMenuItem(fileMenu, ID_OpenNote, "Open\tCtrl+O", "Open an existing encpted note."));
+	fileMenu->Append(new wxMenuItem(fileMenu, ID_SaveNote, "Save\tCtrl+S", "Save the current note."));
 	fileMenu->AppendSeparator();
 	fileMenu->Append(new wxMenuItem(fileMenu, ID_Exit, "Exit", "Close this program."));
 
@@ -52,6 +53,16 @@ Frame::Frame() : wxFrame(nullptr, wxID_ANY, "Crypto Note", wxDefaultPosition, wx
 	this->Bind(wxEVT_UPDATE_UI, &Frame::OnUpdateUI, this, ID_SaveNote);
 	this->Bind(wxEVT_UPDATE_UI, &Frame::OnUpdateUI, this, ID_ChangePassword);
 	this->Bind(wxEVT_AUINOTEBOOK_PAGE_CLOSE, &Frame::OnPageClose, this);
+
+	wxAcceleratorEntry accelEntryArray[3];
+	accelEntryArray[0].Set(wxACCEL_CTRL, (int)'S', ID_SaveNote);
+	accelEntryArray[1].Set(wxACCEL_CTRL, (int)'N', ID_NewNote);
+	accelEntryArray[2].Set(wxACCEL_CTRL, (int)'O', ID_OpenNote);
+
+	int numAccelEntries = sizeof(accelEntryArray) / sizeof(wxAcceleratorEntry);
+
+	wxAcceleratorTable accelTable(numAccelEntries, accelEntryArray);
+	this->SetAcceleratorTable(accelTable);
 }
 
 /*virtual*/ Frame::~Frame()
