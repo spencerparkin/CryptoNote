@@ -216,3 +216,42 @@ bool NotePanel::PasswordStrongEnough(const wxString& passwordCandidate)
 
 	return true;
 }
+
+uint32_t NotePanel::SearchAndReplace(const wxString& searchText, const wxString& replaceText)
+{
+	wxString text = this->textControl->GetValue();
+	uint32_t numReplacements = (uint32_t)text.Replace(searchText, replaceText, true);
+
+	if (numReplacements > 0)
+	{
+		this->textControl->SetValue(text);
+		this->Modified();
+	}
+
+	return numReplacements;
+}
+
+bool NotePanel::HighlightNextMatch(const wxString& searchText)
+{
+	long i = this->textControl->GetInsertionPoint() + 1;
+
+	while (true)
+	{
+		long j = i + searchText.length();
+
+		wxString text = this->textControl->GetRange(i, j);
+		if (text.length() == 0)
+			break;
+
+		if (text == searchText)
+		{
+			this->textControl->SetSelection(i, j);
+			return true;
+		}
+
+		i++;
+	}
+
+	this->textControl->SetInsertionPoint(0);
+	return false;
+}

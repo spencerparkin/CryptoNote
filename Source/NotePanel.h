@@ -19,6 +19,8 @@ public:
 	void Modified();
 	bool ChangePassword();
 	wxString GetSelectedText();
+	uint32_t SearchAndReplace(const wxString& searchText, const wxString& replaceText);
+	bool HighlightNextMatch(const wxString& searchText);
 
 private:
 

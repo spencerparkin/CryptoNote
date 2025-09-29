@@ -22,6 +22,7 @@ public:
 		ID_ChangePassword,
 		ID_Find,
 		ID_FindAndReplace,
+		ID_RepeatLastFind,
 		ID_Exit,
 		ID_About
 	};
@@ -39,6 +40,8 @@ private:
 	void OnPageClose(wxAuiNotebookEvent& event);
 	void OnChangePassword(wxCommandEvent& event);
 	void OnFind(wxCommandEvent& event);
+	void OnCloseWindow(wxCloseEvent& event);
 
 	wxAuiNotebook* noteBook;
+	wxString searchText;
 };

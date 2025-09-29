@@ -19,7 +19,9 @@ Frame::Frame() : wxFrame(nullptr, wxID_ANY, "Crypto Note", wxDefaultPosition, wx
 
 	wxMenu* editMenu = new wxMenu();
 	editMenu->Append(new wxMenuItem(editMenu, ID_Find, "Find\tCtrl+F", "Find text in the current note."));
-	editMenu->Append(new wxMenuItem(editMenu, ID_FindAndReplace, "Find & Replace", "Replace all occurrances of certain text with other text."));
+	editMenu->Append(new wxMenuItem(editMenu, ID_FindAndReplace, "Find And Replace", "Replace all occurrances of certain text with other text."));
+	editMenu->AppendSeparator();
+	editMenu->Append(new wxMenuItem(editMenu, ID_RepeatLastFind, "Repeat Find\tF3", "Repleat the last find operation from the current cursor location."));
 
 	wxMenu* optionsMenu = new wxMenu();
 	optionsMenu->Append(new wxMenuItem(optionsMenu, ID_ChangePassword, "Change Password", "Change the password used on the current note."));
@@ -56,23 +58,25 @@ Frame::Frame() : wxFrame(nullptr, wxID_ANY, "Crypto Note", wxDefaultPosition, wx
 	this->Bind(wxEVT_MENU, &Frame::OnAbout, this, ID_About);
 	this->Bind(wxEVT_MENU, &Frame::OnFind, this, ID_Find);
 	this->Bind(wxEVT_MENU, &Frame::OnFind, this, ID_FindAndReplace);
+	this->Bind(wxEVT_MENU, &Frame::OnFind, this, ID_RepeatLastFind);
 	this->Bind(wxEVT_UPDATE_UI, &Frame::OnUpdateUI, this, ID_NewNote);
 	this->Bind(wxEVT_UPDATE_UI, &Frame::OnUpdateUI, this, ID_OpenNote);
 	this->Bind(wxEVT_UPDATE_UI, &Frame::OnUpdateUI, this, ID_SaveNote);
 	this->Bind(wxEVT_UPDATE_UI, &Frame::OnUpdateUI, this, ID_ChangePassword);
 	this->Bind(wxEVT_UPDATE_UI, &Frame::OnUpdateUI, this, ID_Find);
 	this->Bind(wxEVT_UPDATE_UI, &Frame::OnUpdateUI, this, ID_FindAndReplace);
+	this->Bind(wxEVT_UPDATE_UI, &Frame::OnUpdateUI, this, ID_RepeatLastFind);
 	this->Bind(wxEVT_AUINOTEBOOK_PAGE_CLOSE, &Frame::OnPageClose, this);
+	this->Bind(wxEVT_CLOSE_WINDOW, &Frame::OnCloseWindow, this);
 
-	wxAcceleratorEntry accelEntryArray[4];
-	accelEntryArray[0].Set(wxACCEL_CTRL, (int)'S', ID_SaveNote);
-	accelEntryArray[1].Set(wxACCEL_CTRL, (int)'N', ID_NewNote);
-	accelEntryArray[2].Set(wxACCEL_CTRL, (int)'O', ID_OpenNote);
-	accelEntryArray[3].Set(wxACCEL_CTRL, (int)'F', ID_Find);
+	std::vector<wxAcceleratorEntry> accelEntryArray;
+	accelEntryArray.push_back(wxAcceleratorEntry(wxACCEL_CTRL, (int)'S', ID_SaveNote));
+	accelEntryArray.push_back(wxAcceleratorEntry(wxACCEL_CTRL, (int)'N', ID_NewNote));
+	accelEntryArray.push_back(wxAcceleratorEntry(wxACCEL_CTRL, (int)'O', ID_OpenNote));
+	accelEntryArray.push_back(wxAcceleratorEntry(wxACCEL_CTRL, (int)'F', ID_Find));
+	accelEntryArray.push_back(wxAcceleratorEntry(wxACCEL_NORMAL, WXK_F3, ID_RepeatLastFind));
 
-	int numAccelEntries = sizeof(accelEntryArray) / sizeof(wxAcceleratorEntry);
-
-	wxAcceleratorTable accelTable(numAccelEntries, accelEntryArray);
+	wxAcceleratorTable accelTable((int)accelEntryArray.size(), accelEntryArray.data());
 	this->SetAcceleratorTable(accelTable);
 }
 
@@ -87,21 +91,35 @@ void Frame::OnFind(wxCommandEvent& event)
 	if (!notePanel)
 		return;
 
-	wxString searchText = notePanel->GetSelectedText();
-	wxTextEntryDialog searchTextDialog(this, "Enter search text.", "Find", searchText);
-	if (searchTextDialog.ShowModal() != wxID_OK)
-		return;
-
-	searchText = searchTextDialog.GetValue();
-
-	if (event.GetId() == ID_FindAndReplace)
+	if (event.GetId() == ID_Find || event.GetId() == ID_FindAndReplace)
 	{
-		wxTextEntryDialog replaceTextDialog(this, "Enter replacement text.", "Replace", searchText);
-		if (replaceTextDialog.ShowModal() != wxID_OK)
+		this->searchText = notePanel->GetSelectedText();
+		wxTextEntryDialog searchTextDialog(this, "Enter search text.", "Find", searchText);
+		if (searchTextDialog.ShowModal() != wxID_OK)
+			return;
+
+		this->searchText = searchTextDialog.GetValue();
+		if (this->searchText.empty())
 			return;
 	}
 
-	// STPTODO: Write this.
+	if (event.GetId() == ID_FindAndReplace)
+	{
+		wxTextEntryDialog replaceTextDialog(this, "Enter replacement text.", "Replace", this->searchText);
+		if (replaceTextDialog.ShowModal() != wxID_OK)
+			return;
+
+		wxString replaceText = replaceTextDialog.GetValue();
+		uint32_t numReplacements = notePanel->SearchAndReplace(this->searchText, replaceText);
+		wxMessageBox(wxString::Format("Made %d replacements.", numReplacements), "Find & Replace", wxOK | wxICON_INFORMATION, this);
+	}
+	else
+	{
+		if (!notePanel->HighlightNextMatch(this->searchText))
+		{
+			wxMessageBox(wxString::Format("No more instances of \"%s\" could be found in the text.", this->searchText.c_str()), "Find", wxOK | wxICON_INFORMATION, this);
+		}
+	}
 }
 
 void Frame::OnChangePassword(wxCommandEvent& event)
@@ -152,6 +170,32 @@ void Frame::UpdatePageTitleForPage(NotePanel* notePanel)
 		this->noteBook->SetPageText(i, notePanel->GetTabTitle());
 }
 
+void Frame::OnCloseWindow(wxCloseEvent& event)
+{
+	bool unsavedChanges = false;
+	for (int i = 0; i < (int)this->noteBook->GetPageCount(); i++)
+	{
+		auto notePanel = dynamic_cast<NotePanel*>(this->noteBook->GetPage(i));
+		if (notePanel && notePanel->NeedsSave())
+		{
+			unsavedChanges = true;
+			break;
+		}
+	}
+
+	if (unsavedChanges)
+	{
+		int result = wxMessageBox("One or more open notes have unsaved changes.  Close anyway?", "Close?", wxYES_NO | wxICON_QUESTION, this);
+		if (result == wxNO)
+		{
+			event.Veto();
+			return;
+		}
+	}
+
+	event.Skip();
+}
+
 void Frame::OnPageClose(wxAuiNotebookEvent& event)
 {
 	int i = event.GetSelection();
@@ -161,12 +205,12 @@ void Frame::OnPageClose(wxAuiNotebookEvent& event)
 		if (notePanel->NeedsSave())
 		{
 			int result = wxMessageBox("You have unsaved changes.  Save now before close?", "Save?", wxYES_NO | wxCANCEL | wxICON_QUESTION, this);
-			if (result == wxID_YES)
+			if (result == wxYES)
 			{
 				if (!notePanel->Save())
 					event.Veto();
 			}
-			else if (result == wxID_CANCEL)
+			else if (result == wxCANCEL)
 			{
 				event.Veto();
 			}
@@ -206,6 +250,11 @@ void Frame::OnUpdateUI(wxUpdateUIEvent& event)
 		case ID_FindAndReplace:
 		{
 			event.Enable(this->noteBook->GetSelection() != wxNOT_FOUND);
+			break;
+		}
+		case ID_RepeatLastFind:
+		{
+			event.Enable(this->noteBook->GetSelection() != wxNOT_FOUND && this->searchText.size() > 0);
 			break;
 		}
 	}
