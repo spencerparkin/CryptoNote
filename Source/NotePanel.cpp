@@ -233,17 +233,18 @@ uint32_t NotePanel::SearchAndReplace(const wxString& searchText, const wxString&
 
 bool NotePanel::HighlightNextMatch(const wxString& searchText)
 {
+	wxString searchTextLower = searchText.Lower();
 	long i = this->textControl->GetInsertionPoint() + 1;
 
 	while (true)
 	{
-		long j = i + searchText.length();
+		long j = i + searchTextLower.length();
 
 		wxString text = this->textControl->GetRange(i, j);
 		if (text.length() == 0)
 			break;
 
-		if (text == searchText)
+		if (text.Lower() == searchTextLower)
 		{
 			this->textControl->SetSelection(i, j);
 			return true;
