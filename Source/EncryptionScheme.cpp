@@ -1,6 +1,7 @@
 #include "EncryptionScheme.h"
 #include <openssl/evp.h>
 #include <openssl/rand.h>
+#include <wx/log.h>
 #include <assert.h>
 
 //--------------------------------------- EncryptionScheme ---------------------------------------
@@ -36,17 +37,17 @@ NoEncryptionScheme::NoEncryptionScheme()
 	return true;
 }
 
-//--------------------------------------- AESEncryptionScheme ---------------------------------------
+//--------------------------------------- OpenSSL_AES_EncryptionScheme ---------------------------------------
 
-AESEncryptionScheme::AESEncryptionScheme()
+OpenSSL_AES_EncryptionScheme::OpenSSL_AES_EncryptionScheme()
 {
 }
 
-/*virtual*/ AESEncryptionScheme::~AESEncryptionScheme()
+/*virtual*/ OpenSSL_AES_EncryptionScheme::~OpenSSL_AES_EncryptionScheme()
 {
 }
 
-/*virtual*/ bool AESEncryptionScheme::Encrypt(const std::string& plainText, const std::string& password, std::vector<uint8_t>& cipherText)
+/*virtual*/ bool OpenSSL_AES_EncryptionScheme::Encrypt(const std::string& plainText, const std::string& password, std::vector<uint8_t>& cipherText)
 {
 	bool success = false;
 	int result = 0;
@@ -136,7 +137,7 @@ AESEncryptionScheme::AESEncryptionScheme()
 	return success;
 }
 
-/*virtual*/ bool AESEncryptionScheme::Decrypt(const std::vector<uint8_t>& cipherText, const std::string& password, std::string& plainText)
+/*virtual*/ bool OpenSSL_AES_EncryptionScheme::Decrypt(const std::vector<uint8_t>& cipherText, const std::string& password, std::string& plainText)
 {
 	bool success = false;
 	int result = 0;
@@ -218,13 +219,186 @@ AESEncryptionScheme::AESEncryptionScheme()
 	return success;
 }
 
-bool AESEncryptionScheme::MakeKey(const std::string& password, const uint8_t* saltBuffer, uint32_t saltBufferSize, uint8_t* keyBuffer, uint32_t keyBufferSize)
+bool OpenSSL_AES_EncryptionScheme::MakeKey(const std::string& password, const uint8_t* saltBuffer, uint32_t saltBufferSize, uint8_t* keyBuffer, uint32_t keyBufferSize)
 {
 	assert(keyBufferSize == 32);
 
 	int result = PKCS5_PBKDF2_HMAC(password.c_str(), password.length(), saltBuffer, saltBufferSize, 200000, EVP_sha256(), keyBufferSize, keyBuffer);
 	if (result != 1)
 		return false;
+
+	return true;
+}
+
+//--------------------------------------- BCrypt_AES_EncryptionScheme ---------------------------------------
+
+BCrypt_AES_EncryptionScheme::BCrypt_AES_EncryptionScheme()
+{
+}
+
+/*virtual*/ BCrypt_AES_EncryptionScheme::~BCrypt_AES_EncryptionScheme()
+{
+}
+
+/*virtual*/ bool BCrypt_AES_EncryptionScheme::Encrypt(const std::string& plainText, const std::string& password, std::vector<uint8_t>& cipherText)
+{
+	NTSTATUS status = 0;
+	BCRYPT_KEY_HANDLE hKey = nullptr;
+	BCRYPT_ALG_HANDLE hAesAlg = nullptr;
+
+	status = BCryptOpenAlgorithmProvider(&hAesAlg, BCRYPT_AES_ALGORITHM, nullptr, 0);
+	if (!BCRYPT_SUCCESS(status))
+	{
+		wxLogError("Failed to get AES algorithm provider.");
+		return false;
+	}
+
+	status = BCryptSetProperty(hAesAlg, BCRYPT_CHAINING_MODE, (PUCHAR)BCRYPT_CHAIN_MODE_CBC, sizeof(BCRYPT_CHAIN_MODE_CBC), 0);
+	if (!BCRYPT_SUCCESS(status))
+		return false;
+
+	std::vector<BYTE> keyObject;
+	if (!this->MakeKey(hAesAlg, hKey, keyObject, password))
+		return false;
+
+	// Make random initialization vector.
+	BYTE iv[16];
+	BCryptGenRandom(nullptr, iv, sizeof(iv), BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+
+	// Copy IV now since it gets modified during the encryption process.
+	BYTE originalIV[16];
+	for (int i = 0; i < 16; i++)
+		originalIV[i] = iv[i];
+
+	// How big does the cipher text need to be?
+	DWORD cipherTextSize = 0;
+	status = BCryptEncrypt(hKey, (PUCHAR)plainText.data(), (ULONG)plainText.size(), nullptr, iv, sizeof(iv), nullptr, 0, &cipherTextSize, BCRYPT_BLOCK_PADDING);
+	if (!BCRYPT_SUCCESS(status))
+	{
+		wxLogError("Failed to determine cipher text size.");
+		return false;
+	}
+
+	cipherText.resize(cipherTextSize);
+
+	// Encrypt!
+	status = BCryptEncrypt(hKey, (PUCHAR)plainText.data(), (ULONG)plainText.size(), nullptr, iv, sizeof(iv), cipherText.data(), cipherTextSize, &cipherTextSize, BCRYPT_BLOCK_PADDING);
+	if (!BCRYPT_SUCCESS(status))
+	{
+		wxLogError("Encryption failed!");
+		return false;
+	}
+
+	// Tack this onto the cipher text since we'll need it later for decryption.
+	for (int i = 0; i < sizeof(iv); i++)
+		cipherText.push_back(originalIV[i]);
+
+	BCryptDestroyKey(hKey);
+	BCryptCloseAlgorithmProvider(hAesAlg, 0);
+
+	return true;
+}
+
+/*virtual*/ bool BCrypt_AES_EncryptionScheme::Decrypt(const std::vector<uint8_t>& cipherText, const std::string& password, std::string& plainText)
+{
+	NTSTATUS status = 0;
+	BCRYPT_KEY_HANDLE hKey = nullptr;
+	BCRYPT_ALG_HANDLE hAesAlg = nullptr;
+
+	status = BCryptOpenAlgorithmProvider(&hAesAlg, BCRYPT_AES_ALGORITHM, nullptr, 0);
+	if (!BCRYPT_SUCCESS(status))
+	{
+		wxLogError("Failed to get AES algorithm provider.");
+		return false;
+	}
+
+	BCryptSetProperty(hAesAlg, BCRYPT_CHAINING_MODE, (PUCHAR)BCRYPT_CHAIN_MODE_CBC, sizeof(BCRYPT_CHAIN_MODE_CBC), 0);
+
+	std::vector<BYTE> keyObject;
+	if (!this->MakeKey(hAesAlg, hKey, keyObject, password))
+		return false;
+
+	// Grab the IV we tacked onto the end of the cipher text.
+	BYTE iv[16];
+	for (int i = 0; i < 16; i++)
+	{
+		int j = int(cipherText.size()) - 16 + i;
+		iv[i] = cipherText[j];
+	}
+
+	// How big is the plain text?
+	DWORD decryptedSize = 0;
+	status = BCryptDecrypt(hKey, (PUCHAR)cipherText.data(), cipherText.size() - 16, nullptr, iv, sizeof(iv), nullptr, 0, &decryptedSize, BCRYPT_BLOCK_PADDING);
+	if (!BCRYPT_SUCCESS(status))
+	{
+		wxLogError("Could not determine plain text size of encrypted data.");
+		return false;
+	}
+
+	// Decrypt!
+	std::vector<BYTE> decrypted(decryptedSize);
+	status = BCryptDecrypt(hKey, (PUCHAR)cipherText.data(), cipherText.size() - 16, nullptr, iv, sizeof(iv), decrypted.data(), decryptedSize, &decryptedSize, BCRYPT_BLOCK_PADDING);
+	if (!BCRYPT_SUCCESS(status))
+	{
+		wxLogError("Failed to decrypt!");
+		return false;
+	}
+
+	plainText.reserve(decryptedSize);
+	plainText = "";
+	for (int i = 0; i < decryptedSize; i++)
+		plainText.push_back(decrypted[i]);
+
+	BCryptDestroyKey(hKey);
+	BCryptCloseAlgorithmProvider(hAesAlg, 0);
+
+	return true;
+}
+
+bool BCrypt_AES_EncryptionScheme::MakeKey(BCRYPT_ALG_HANDLE hAesAlg, BCRYPT_KEY_HANDLE& hKey, std::vector<BYTE>& keyObject, const std::string& password)
+{
+	hKey = nullptr;
+
+	NTSTATUS status = 0;
+	BCRYPT_ALG_HANDLE hHashAlg = nullptr;
+	BCRYPT_HASH_HANDLE hHash = nullptr;
+
+	DWORD hashObjectSize = 0;
+	DWORD dataSize = 0;
+	DWORD hashSize = 0;
+
+	status = BCryptOpenAlgorithmProvider(&hHashAlg, BCRYPT_SHA256_ALGORITHM, nullptr, 0);
+	if (!BCRYPT_SUCCESS(status))
+	{
+		wxLogError("Failed to get SHA256 algorithm.");
+		return false;
+	}
+
+	BCryptGetProperty(hHashAlg, BCRYPT_OBJECT_LENGTH, (PUCHAR)&hashObjectSize, sizeof(DWORD), &dataSize, 0);
+	BCryptGetProperty(hHashAlg, BCRYPT_HASH_LENGTH, (PUCHAR)&hashSize, sizeof(DWORD), &dataSize, 0);
+
+	std::vector<BYTE> hashObject(hashObjectSize);
+	std::vector<BYTE> key(hashSize);
+
+	BCryptCreateHash(hHashAlg, &hHash, hashObject.data(), hashObjectSize, nullptr, 0, 0);
+
+	BCryptHashData(hHash, (PUCHAR)password.c_str(), (ULONG)password.length(), 0);
+	BCryptFinishHash(hHash, key.data(), hashSize, 0);
+
+	BCryptDestroyHash(hHash);
+	BCryptCloseAlgorithmProvider(hHashAlg, 0);
+
+	// Make a symmetric key.
+	DWORD keyObjectSize = 0;
+	DWORD cbData = 0;
+	BCryptGetProperty(hAesAlg, BCRYPT_OBJECT_LENGTH, (PUCHAR)&keyObjectSize, sizeof(DWORD), &cbData, 0);
+	keyObject.resize(keyObjectSize);
+	status = BCryptGenerateSymmetricKey(hAesAlg, &hKey, keyObject.data(), keyObjectSize, key.data(), (ULONG)key.size(), 0);
+	if (!BCRYPT_SUCCESS(status))
+	{
+		wxLogError("Failed to make symmetric key.");
+		return false;
+	}
 
 	return true;
 }

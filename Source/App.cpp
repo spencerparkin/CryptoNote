@@ -18,7 +18,7 @@ Application::Application()
 	if (!wxApp::OnInit())
 		return false;
 
-	this->encryptionScheme.reset(new AESEncryptionScheme());
+	this->encryptionScheme.reset(new OpenSSL_AES_EncryptionScheme());
 
 	this->frame = new Frame();
 	this->frame->Show();

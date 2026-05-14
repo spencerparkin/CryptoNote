@@ -45,6 +45,7 @@ target_link_libraries(CryptoNote
 	wx::aui
 	libssl.lib
 	libcrypto.lib
+	bcrypt
 )
 
 target_link_directories(CryptoNote PRIVATE
